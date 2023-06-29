@@ -398,7 +398,9 @@ mod serde_impl {
 #[cfg(test)]
 mod tests {
 
-    use crate::{StaticType, TypeSafeId};
+    use std::str::FromStr;
+
+    use crate::{DynamicType, StaticType, TypeSafeId};
 
     #[derive(Default)]
     struct Prefix;
@@ -418,5 +420,46 @@ mod tests {
 
         assert_eq!(uid.uuid(), uuid);
         assert_eq!(uid.to_string(), str);
+    }
+
+    #[test]
+    fn test_parse_valid() {
+        assert!(TypeSafeId::<DynamicType>::from_str("prefix_01h2xcejqtf2nbrexx3vqjhp41").is_ok());
+        assert!(TypeSafeId::<DynamicType>::from_str("prefix_00000000000000000000000000").is_ok());
+        assert!(TypeSafeId::<DynamicType>::from_str("prefix_00041061050r3gg28a1c60t3gf").is_ok());
+        assert!(TypeSafeId::<DynamicType>::from_str("user_2x4y6z8a0b1c2d3e4f5g6h7j8k").is_ok());
+        assert!(TypeSafeId::<DynamicType>::from_str("user_064gbdajmnxkk59ght00j0zxc8").is_ok());
+    }
+
+    #[test]
+    fn test_parse_invalid() {
+        assert!(TypeSafeId::<DynamicType>::from_str("too short").is_err());
+        assert!(
+            TypeSafeId::<DynamicType>::from_str("verylongstringbutitdoesnthaveunderscore").is_err()
+        );
+        assert!(
+            TypeSafeId::<DynamicType>::from_str("Invalid Prefix_064gaudtfto2f41a9u69osbirg")
+                .is_err()
+        );
+        assert!(TypeSafeId::<DynamicType>::from_str("user_064gaudtft@2f$1a9u69osbirg").is_err());
+        assert!(TypeSafeId::<DynamicType>::from_str("user_064gbdujmnxkk59ght00j0zxc8").is_err());
+        assert!(TypeSafeId::<DynamicType>::from_str("user_idpartisveryveryveryverylong").is_err());
+        assert!(TypeSafeId::<DynamicType>::from_str("_064gaudtfto2f41a9u69osbirg").is_err());
+        assert!(TypeSafeId::<DynamicType>::from_str(
+            "veryveryveryveryveryveryveryveryveryveryvery\
+                    veryveryveryveryveryveryveryveryveryveryverylongprefix\
+                    _064gaudtfto2f41a9u69osbirg"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn decodes_confusables() {
+        let confused = "prefix_0o1liABCDEFGHIJKLMNOPQRSTV";
+        let expected = "prefix_00111abcdefgh1jk1mn0pqrstv";
+
+        let uid: PrefixId = confused.parse().unwrap();
+        let actual = uid.to_string();
+        assert_eq!(actual, expected);
     }
 }
