@@ -1,0 +1,11 @@
+[package]
+name = "type-safe-id"
+version = "0.0.0"
+edition = "2021"
+description = "A type-safe, K-sortable, globally unique identifier"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/conrad/type-safe-id"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
