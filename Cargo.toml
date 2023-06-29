@@ -1,6 +1,6 @@
 [package]
 name = "type-safe-id"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
 description = "A type-safe, K-sortable, globally unique identifier"
 license = "MIT OR Apache-2.0"
@@ -8,4 +8,19 @@ repository = "https://github.com/conrad/type-safe-id"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = []
+serde = ["dep:serde", "smol_str/serde"]
+
 [dependencies]
+uuid = { version = "1.4.0", features = ["std"] }
+rand = { version = "0.8.0" }
+thiserror = "1.0.0"
+smol_str = "0.2.0"
+
+serde = { version = "1", optional = true }
+
+# Properly document all features on docs.rs
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
