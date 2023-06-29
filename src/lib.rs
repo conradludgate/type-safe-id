@@ -31,6 +31,12 @@
 //! ```
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+#[cfg(feature = "arbitrary")]
+mod arbitrary;
+
+#[cfg(feature = "serde")]
+mod serde;
+
 use std::{
     fmt::{self, Write},
     str::FromStr,
@@ -163,7 +169,27 @@ impl Type for DynamicType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TypeSafeId<T> {
     tag: T,
-    data: Uuid,
+    data: Uuid128,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct Uuid128(u128);
+
+impl fmt::Debug for Uuid128 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Uuid::from(*self).fmt(f)
+    }
+}
+
+impl From<Uuid> for Uuid128 {
+    fn from(value: Uuid) -> Self {
+        Self(u128::from_be_bytes(value.into_bytes()))
+    }
+}
+impl From<Uuid128> for Uuid {
+    fn from(value: Uuid128) -> Self {
+        Uuid::from_bytes(value.0.to_be_bytes())
+    }
 }
 
 impl<T: StaticType> TypeSafeId<T> {
@@ -197,7 +223,12 @@ impl<T: Type> TypeSafeId<T> {
         ts: uuid::Timestamp,
         rng: &mut impl rand::Rng,
     ) -> Result<Self, Error> {
-        Self::from_type_and_uuid(type_prefix, encode_unix_timestamp_millis(ts, &rng.gen()))
+        let (secs, nanos) = ts.to_unix();
+        let millis = (secs * 1000).saturating_add(nanos as u64 / 1_000_000);
+        Self::from_type_and_uuid(
+            type_prefix,
+            encode_unix_timestamp_millis(millis, &rng.gen()),
+        )
     }
 
     /// Create a new type-id with the given type prefix and uuid data
@@ -209,7 +240,7 @@ impl<T: Type> TypeSafeId<T> {
 
         Ok(Self {
             tag: type_prefix,
-            data,
+            data: data.into(),
         })
     }
 
@@ -217,7 +248,7 @@ impl<T: Type> TypeSafeId<T> {
         self.tag.to_type_prefix()
     }
     pub fn uuid(&self) -> Uuid {
-        self.data
+        self.data.into()
     }
 }
 
@@ -233,25 +264,9 @@ impl<T: Type> FromStr for TypeSafeId<T> {
                         expected,
                     })?;
 
-                let mut id: [u8; 26] = id.as_bytes().try_into().map_err(|_| Error::InvalidData)?;
-                let mut max = 0;
-                for b in &mut id {
-                    *b = CROCKFORD_INV[*b as usize];
-                    max = u8::max(max, *b);
-                }
-                if max > 32 {
-                    return Err(Error::InvalidData);
-                }
-
-                let mut out = 0u128;
-                for b in id {
-                    out <<= 5;
-                    out |= b as u128;
-                }
-
                 Ok(Self {
                     tag,
-                    data: Uuid::from_bytes(out.to_be_bytes()),
+                    data: parse_base32_uuid7(id)?,
                 })
             }
             None => Err(Error::NotATypeId),
@@ -259,26 +274,47 @@ impl<T: Type> FromStr for TypeSafeId<T> {
     }
 }
 
+fn parse_base32_uuid7(id: &str) -> Result<Uuid128, Error> {
+    let mut id: [u8; 26] = id.as_bytes().try_into().map_err(|_| Error::InvalidData)?;
+    let mut max = 0;
+    for b in &mut id {
+        *b = CROCKFORD_INV[*b as usize];
+        max = u8::max(max, *b);
+    }
+    if max > 32 {
+        return Err(Error::InvalidData);
+    }
+
+    let mut out = 0u128;
+    for b in id {
+        out <<= 5;
+        out |= b as u128;
+    }
+
+    Ok(Uuid128(out))
+}
+
 impl<T: Type> fmt::Display for TypeSafeId<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut buf = [0; 26];
-        let mut x = u128::from_be_bytes(*self.data.as_bytes());
-        for b in buf.iter_mut().rev() {
-            *b = CROCKFORD[((x as u8) & 0x1f) as usize];
-            x >>= 5;
-        }
-        let s = std::str::from_utf8(&buf).map_err(|_| fmt::Error)?;
-        f.write_str(self.tag.to_type_prefix())?;
-        f.write_char('_')?;
-        f.write_str(s)
+        fmt_type_id(self.tag.to_type_prefix(), self.data.0, f)
     }
+}
+
+fn fmt_type_id(tag: &str, mut data: u128, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let mut buf = [0; 26];
+    for b in buf.iter_mut().rev() {
+        *b = CROCKFORD[((data as u8) & 0x1f) as usize];
+        data >>= 5;
+    }
+    let s = std::str::from_utf8(&buf).map_err(|_| fmt::Error)?;
+    f.write_str(tag)?;
+    f.write_char('_')?;
+    f.write_str(s)
 }
 
 // basically just ripped from the uuid crate. they have it as unstable, but we can use it fine.
 #[inline]
-const fn encode_unix_timestamp_millis(ts: uuid::Timestamp, random_bytes: &[u8; 10]) -> Uuid {
-    let (secs, nanos) = ts.to_unix();
-    let millis = (secs * 1000).saturating_add(nanos as u64 / 1_000_000);
+const fn encode_unix_timestamp_millis(millis: u64, random_bytes: &[u8; 10]) -> Uuid {
     let millis_high = ((millis >> 16) & 0xFFFF_FFFF) as u32;
     let millis_low = (millis & 0xFFFF) as u16;
 
@@ -327,73 +363,6 @@ const CROCKFORD_INV: &[u8; 256] = &{
 
     output
 };
-
-#[cfg(feature = "serde")]
-mod serde_impl {
-    use std::fmt;
-
-    use serde::{Deserialize, Serialize};
-
-    use crate::{DynamicType, StaticType, Type, TypeSafeId};
-
-    #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
-    impl<T: Type> Serialize for TypeSafeId<T> {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            serializer.collect_str(self)
-        }
-    }
-
-    #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
-    impl<'de, T: StaticType> Deserialize<'de> for TypeSafeId<T> {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            struct FromStrVisitor<T>(std::marker::PhantomData<T>);
-            impl<'de, T: StaticType> serde::de::Visitor<'de> for FromStrVisitor<T> {
-                type Value = TypeSafeId<T>;
-
-                fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                    write!(formatter, "a type-id with {:?} type prefix", T::TYPE)
-                }
-                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-                where
-                    E: serde::de::Error,
-                {
-                    v.parse().map_err(E::custom)
-                }
-            }
-            deserializer.deserialize_str(FromStrVisitor(std::marker::PhantomData))
-        }
-    }
-
-    #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
-    impl<'de> Deserialize<'de> for TypeSafeId<DynamicType> {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            struct FromStrVisitor;
-            impl<'de> serde::de::Visitor<'de> for FromStrVisitor {
-                type Value = TypeSafeId<DynamicType>;
-
-                fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                    write!(formatter, "a type-id")
-                }
-                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-                where
-                    E: serde::de::Error,
-                {
-                    v.parse().map_err(E::custom)
-                }
-            }
-            deserializer.deserialize_str(FromStrVisitor)
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,6 @@
 [package]
 name = "type-safe-id"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "A type-safe, K-sortable, globally unique identifier"
 license = "MIT OR Apache-2.0"
@@ -10,6 +10,7 @@ repository = "https://github.com/conrad/type-safe-id"
 
 [features]
 default = []
+arbitrary = ["dep:arbitrary", "smol_str/arbitrary"]
 serde = ["dep:serde", "smol_str/serde"]
 
 [dependencies]
@@ -18,9 +19,23 @@ rand = { version = "0.8.0" }
 thiserror = "1.0.0"
 smol_str = "0.2.0"
 
-serde = { version = "1", optional = true }
+serde = { version = "1.0.0", optional = true }
+arbitrary = { version = "1.3", optional = true }
 
 # Properly document all features on docs.rs
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[dev-dependencies]
+criterion = "0.5"
+libtest-mimic = "0.6"
+
+[[bench]]
+name = "type_id"
+harness = false
+
+[[test]]
+name = "spec"
+path = "tests/spec.rs"
+harness = false
