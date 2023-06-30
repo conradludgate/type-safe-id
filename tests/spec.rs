@@ -64,14 +64,9 @@ mod invalid_suffix {
             "long",
             "012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789",
         );
-        // we implement the parsing of capitcal letters
-        // add_test(t, "caps", "00041061050R3GG28A1C60T3GF");
-
+        add_test(t, "caps", "00041061050R3GG28A1C60T3GF");
         add_test(t, "hyphens", "00041061050-3gg28a1-60t3gf");
-
-        // we implement the parsing of ambiguous characters
-        // add_test(t, "crockford_ambiguous", "ooo41o61o5or3gg28a1c6ot3gi");
-
+        add_test(t, "crockford_ambiguous", "ooo41o61o5or3gg28a1c6ot3gi");
         add_test(t, "symbols", "00041061050.3gg28a1_60t3gf");
         add_test(t, "wrong_alphabet", "ooooooiiiiiiuuuuuuulllllll");
     }

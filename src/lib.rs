@@ -345,21 +345,21 @@ const CROCKFORD_INV: &[u8; 256] = &{
         i += 1;
     }
 
-    // uppercases
-    let mut i = 10;
-    while i < 32 {
-        output[(CROCKFORD[i as usize] - b'a' + b'A') as usize] = i;
-        i += 1;
-    }
+    // // uppercases
+    // let mut i = 10;
+    // while i < 32 {
+    //     output[(CROCKFORD[i as usize] - b'a' + b'A') as usize] = i;
+    //     i += 1;
+    // }
 
-    // confusables
-    output[b'O' as usize] = 0;
-    output[b'o' as usize] = 0;
+    // // confusables
+    // output[b'O' as usize] = 0;
+    // output[b'o' as usize] = 0;
 
-    output[b'I' as usize] = 1;
-    output[b'i' as usize] = 1;
-    output[b'L' as usize] = 1;
-    output[b'l' as usize] = 1;
+    // output[b'I' as usize] = 1;
+    // output[b'i' as usize] = 1;
+    // output[b'L' as usize] = 1;
+    // output[b'l' as usize] = 1;
 
     output
 };
