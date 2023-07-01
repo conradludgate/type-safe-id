@@ -1,4 +1,5 @@
 use arbitrary::{Arbitrary, Result, Unstructured};
+use arrayvec::ArrayString;
 
 use crate::{encode_unix_timestamp_millis, DynamicType, StaticType, TypeSafeId};
 
@@ -8,15 +9,28 @@ impl<'a, T: StaticType> Arbitrary<'a> for TypeSafeId<T> {
         let millis = u.arbitrary::<u64>()? & 0xFFFF_FFFF_FFFF; // 48 bits
         let data: [u8; 10] = u.arbitrary()?;
 
-        Self::from_type_and_uuid(T::default(), encode_unix_timestamp_millis(millis, &data))
-            .map_err(|_| arbitrary::Error::IncorrectFormat)
+        Ok(Self::from_type_and_uuid(
+            T::default(),
+            encode_unix_timestamp_millis(millis, &data),
+        ))
     }
 }
 
 #[cfg_attr(docsrs, doc(cfg(feature = "arbitrary")))]
 impl<'a> Arbitrary<'a> for DynamicType {
     fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self> {
-        u.arbitrary().map(DynamicType)
+        let size = u.arbitrary_len::<u8>()?;
+        let mut str = ArrayString::<63>::new();
+        while !str.is_full() && str.len() < size {
+            match u.peek_bytes(1) {
+                Some([b @ b'a'..=b'z']) => {
+                    str.push(*b as char);
+                    u.bytes(1)?;
+                }
+                _ => break,
+            }
+        }
+        Ok(DynamicType(str))
     }
 }
 
@@ -27,7 +41,9 @@ impl<'a> Arbitrary<'a> for TypeSafeId<DynamicType> {
         let millis = u.arbitrary::<u64>()? & 0xFFFF_FFFF_FFFF; // 48 bits
         let data: [u8; 10] = u.arbitrary()?;
 
-        Self::from_type_and_uuid(tag, encode_unix_timestamp_millis(millis, &data))
-            .map_err(|_| arbitrary::Error::IncorrectFormat)
+        Ok(Self::from_type_and_uuid(
+            tag,
+            encode_unix_timestamp_millis(millis, &data),
+        ))
     }
 }

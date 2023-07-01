@@ -10,7 +10,7 @@ impl<T: Type> Serialize for TypeSafeId<T> {
     where
         S: serde::Serializer,
     {
-        serializer.collect_str(self)
+        serializer.serialize_str(&self.to_array_string())
     }
 }
 
@@ -25,7 +25,11 @@ impl<'de, T: StaticType> Deserialize<'de> for TypeSafeId<T> {
             type Value = TypeSafeId<T>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                write!(formatter, "a type-id with {:?} type prefix", T::TYPE)
+                write!(
+                    formatter,
+                    "a string containing a type-id with {:?} type prefix",
+                    T::TYPE
+                )
             }
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
             where
@@ -49,7 +53,7 @@ impl<'de> Deserialize<'de> for TypeSafeId<DynamicType> {
             type Value = TypeSafeId<DynamicType>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                write!(formatter, "a type-id")
+                write!(formatter, "a string containing a type-id")
             }
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
             where

@@ -16,10 +16,10 @@ type IndexId = TypeSafeId<Index>;
 const UUID: Uuid = uuid!("0188bac7-4afa-78aa-bc3b-bd1eef28d881");
 
 fn format() -> [u8; 32] {
-    let id = IndexId::from_uuid(black_box(UUID)).unwrap();
+    let id = IndexId::from_uuid(black_box(UUID));
 
     let mut out = [0u8; 32];
-    write!(out.as_mut(), "{}", id).unwrap();
+    out.as_mut().write_fmt(format_args!("{id}")).unwrap();
     out
 }
 

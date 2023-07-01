@@ -1,0 +1,34 @@
+[package]
+name = "type-safe-id-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.type-safe-id]
+path = ".."
+features = ["arbitrary"]
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "typeid"
+path = "fuzz_targets/typeid.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "static_typeid"
+path = "fuzz_targets/static_typeid.rs"
+test = false
+doc = false

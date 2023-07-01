@@ -25,9 +25,9 @@ impl StaticType for User {
 // type alias for your custom typed id
 type UserId = TypeSafeId<User>;
 
-let user_id1 = UserId::new().expect("type should be lowercase ascii");
+let user_id1 = UserId::new();
 # std::thread::sleep(std::time::Duration::from_millis(10));
-let user_id2 = UserId::new().expect("type should be lowercase ascii");
+let user_id2 = UserId::new();
 
 let uid1 = user_id1.to_string();
 let uid2 = user_id2.to_string();

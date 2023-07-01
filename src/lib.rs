@@ -14,9 +14,9 @@
 //! // type alias for your custom typed id
 //! type UserId = TypeSafeId<User>;
 //!
-//! let user_id1 = UserId::new().expect("type should be lowercase ascii");
+//! let user_id1 = UserId::new();
 //! # std::thread::sleep(std::time::Duration::from_millis(10));
-//! let user_id2 = UserId::new().expect("type should be lowercase ascii");
+//! let user_id2 = UserId::new();
 //!
 //! let uid1 = user_id1.to_string();
 //! let uid2 = user_id2.to_string();
@@ -37,11 +37,9 @@ mod arbitrary;
 #[cfg(feature = "serde")]
 mod serde;
 
-use std::{
-    fmt::{self, Write},
-    str::FromStr,
-};
+use std::{borrow::Cow, fmt, str::FromStr};
 
+use arrayvec::ArrayString;
 use uuid::{NoContext, Uuid};
 
 #[non_exhaustive]
@@ -53,8 +51,8 @@ pub enum Error {
     /// The ID type did not match the expected type
     #[error("id type {actual:?} does not match expected {expected:?}")]
     IncorrectType {
-        actual: smol_str::SmolStr,
-        expected: &'static str,
+        actual: String,
+        expected: Cow<'static, str>,
     },
     /// The ID data was not valid
     #[error("id data is invalid")]
@@ -66,30 +64,43 @@ pub enum Error {
 
 /// A static type prefix
 pub trait StaticType: Default {
-    /// must be lowercase ascii [a-z] only
+    /// must be lowercase ascii [a-z] only, under 64 characters
     const TYPE: &'static str;
+
+    #[doc(hidden)]
+    const __TYPE_PREFIX_IS_VALID: bool = {
+        assert!(Self::TYPE.len() < 64);
+        let mut i = 0;
+        while i < Self::TYPE.len() {
+            assert!(Self::TYPE.as_bytes()[i].is_ascii_lowercase());
+            i += 1;
+        }
+        true
+    };
 }
 
 /// Represents a type that can serialize to and be parsed from a tag
 pub trait Type: Sized {
     /// Try convert the prefix into the well known type.
     /// If the prefix is incorrect, return the expected prefix.
-    fn try_from_type_prefix(tag: &str) -> Result<Self, &'static str>;
+    fn try_from_type_prefix(tag: &str) -> Result<Self, Cow<'static, str>>;
 
     /// Get the prefix from this type
     fn to_type_prefix(&self) -> &str;
 }
 
 impl<T: StaticType> Type for T {
-    fn try_from_type_prefix(tag: &str) -> Result<Self, &'static str> {
+    fn try_from_type_prefix(tag: &str) -> Result<Self, Cow<'static, str>> {
+        assert!(Self::__TYPE_PREFIX_IS_VALID);
         if tag != Self::TYPE {
-            Err(Self::TYPE)
+            Err(Self::TYPE.into())
         } else {
             Ok(T::default())
         }
     }
 
     fn to_type_prefix(&self) -> &str {
+        assert!(Self::__TYPE_PREFIX_IS_VALID);
         Self::TYPE
     }
 }
@@ -105,7 +116,7 @@ impl<T: StaticType> Type for T {
 /// assert_eq!(id.uuid(), uuid::uuid!("0188bac7-4afa-78aa-bc3b-bd1eef28d881"));
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct DynamicType(smol_str::SmolStr);
+pub struct DynamicType(ArrayString<63>);
 
 impl DynamicType {
     /// Create a new type prefix from a dynamic str
@@ -113,21 +124,29 @@ impl DynamicType {
     /// ```
     /// use type_safe_id::{DynamicType, TypeSafeId};
     ///
-    /// let dynamic_type = DynamicType::new("prefix");
+    /// let dynamic_type = DynamicType::new("prefix").unwrap();
     ///
     /// let data = uuid::uuid!("0188bac7-4afa-78aa-bc3b-bd1eef28d881");
-    /// let id = TypeSafeId::from_type_and_uuid(dynamic_type, data).unwrap();
+    /// let id = TypeSafeId::from_type_and_uuid(dynamic_type, data);
     ///
     /// assert_eq!(id.to_string(), "prefix_01h2xcejqtf2nbrexx3vqjhp41");
     /// ```
-    pub fn new(s: &str) -> Self {
-        Self(s.into())
+    pub fn new(s: &str) -> Result<Self, Error> {
+        let tag: ArrayString<63> = s.try_into().map_err(|_| Error::InvalidType)?;
+        if tag.bytes().any(|x| !x.is_ascii_lowercase()) {
+            return Err(Error::InvalidType);
+        }
+        Ok(Self(tag))
     }
 }
 
 impl Type for DynamicType {
-    fn try_from_type_prefix(tag: &str) -> Result<Self, &'static str> {
-        Ok(Self(tag.into()))
+    fn try_from_type_prefix(tag: &str) -> Result<Self, Cow<'static, str>> {
+        let tag: ArrayString<63> = tag.try_into().map_err(|_| tag[..63].to_owned())?;
+        if tag.bytes().any(|x| !x.is_ascii_lowercase()) {
+            return Err(tag.to_lowercase().into());
+        }
+        Ok(Self(tag))
     }
 
     fn to_type_prefix(&self) -> &str {
@@ -151,9 +170,9 @@ impl Type for DynamicType {
 /// // type alias for your custom typed id
 /// type UserId = TypeSafeId<User>;
 ///
-/// let user_id1 = UserId::new().expect("type should be lowercase ascii");
+/// let user_id1 = UserId::new();
 /// # std::thread::sleep(std::time::Duration::from_millis(10));
-/// let user_id2 = UserId::new().expect("type should be lowercase ascii");
+/// let user_id2 = UserId::new();
 ///
 /// let uid1 = user_id1.to_string();
 /// let uid2 = user_id2.to_string();
@@ -194,7 +213,8 @@ impl From<Uuid128> for Uuid {
 
 impl<T: StaticType> TypeSafeId<T> {
     /// Create a new type-id
-    pub fn new() -> Result<Self, Error> {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
         Self::new_with_ts_rng(
             T::default(),
             uuid::Timestamp::now(NoContext),
@@ -203,14 +223,14 @@ impl<T: StaticType> TypeSafeId<T> {
     }
 
     /// Create a new type-id from the given uuid data
-    pub fn from_uuid(data: Uuid) -> Result<Self, Error> {
+    pub fn from_uuid(data: Uuid) -> Self {
         Self::from_type_and_uuid(T::default(), data)
     }
 }
 
 impl<T: Type> TypeSafeId<T> {
     /// Create a new type-id with the given type prefix
-    pub fn new_with_type(type_prefix: T) -> Result<Self, Error> {
+    pub fn new_with_type(type_prefix: T) -> Self {
         Self::new_with_ts_rng(
             type_prefix,
             uuid::Timestamp::now(NoContext),
@@ -218,11 +238,7 @@ impl<T: Type> TypeSafeId<T> {
         )
     }
 
-    fn new_with_ts_rng(
-        type_prefix: T,
-        ts: uuid::Timestamp,
-        rng: &mut impl rand::Rng,
-    ) -> Result<Self, Error> {
+    fn new_with_ts_rng(type_prefix: T, ts: uuid::Timestamp, rng: &mut impl rand::Rng) -> Self {
         let (secs, nanos) = ts.to_unix();
         let millis = (secs * 1000).saturating_add(nanos as u64 / 1_000_000);
         Self::from_type_and_uuid(
@@ -232,16 +248,11 @@ impl<T: Type> TypeSafeId<T> {
     }
 
     /// Create a new type-id with the given type prefix and uuid data
-    pub fn from_type_and_uuid(type_prefix: T, data: Uuid) -> Result<Self, Error> {
-        let t = type_prefix.to_type_prefix();
-        if t.len() > 63 || t.bytes().any(|b| !b.is_ascii_lowercase()) {
-            return Err(Error::InvalidType);
-        }
-
-        Ok(Self {
+    pub fn from_type_and_uuid(type_prefix: T, data: Uuid) -> Self {
+        Self {
             tag: type_prefix,
             data: data.into(),
-        })
+        }
     }
 
     pub fn type_prefix(&self) -> &str {
@@ -255,22 +266,22 @@ impl<T: Type> TypeSafeId<T> {
 impl<T: Type> FromStr for TypeSafeId<T> {
     type Err = Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.split_once('_') {
-            Some((tag, id)) => {
-                let tag =
-                    T::try_from_type_prefix(tag).map_err(|expected| Error::IncorrectType {
-                        actual: tag.into(),
-                        expected,
-                    })?;
+    fn from_str(id: &str) -> Result<Self, Self::Err> {
+        let (tag, id) = match id.rsplit_once('_') {
+            Some((tag, _)) if tag.is_empty() => return Err(Error::InvalidType),
+            Some((tag, id)) => (tag, id),
+            None => ("", id),
+        };
 
-                Ok(Self {
-                    tag,
-                    data: parse_base32_uuid7(id)?,
-                })
-            }
-            None => Err(Error::NotATypeId),
-        }
+        let tag = T::try_from_type_prefix(tag).map_err(|expected| Error::IncorrectType {
+            actual: tag.into(),
+            expected,
+        })?;
+
+        Ok(Self {
+            tag,
+            data: parse_base32_uuid7(id)?,
+        })
     }
 }
 
@@ -279,7 +290,7 @@ fn parse_base32_uuid7(id: &str) -> Result<Uuid128, Error> {
     let mut max = 0;
     for b in &mut id {
         *b = CROCKFORD_INV[*b as usize];
-        max = u8::max(max, *b);
+        max |= *b;
     }
     if max > 32 {
         return Err(Error::InvalidData);
@@ -296,24 +307,34 @@ fn parse_base32_uuid7(id: &str) -> Result<Uuid128, Error> {
 
 impl<T: Type> fmt::Display for TypeSafeId<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt_type_id(self.tag.to_type_prefix(), self.data.0, f)
+        f.write_str(&self.to_array_string())
     }
 }
 
-fn fmt_type_id(tag: &str, mut data: u128, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut buf = [0; 26];
-    for b in buf.iter_mut().rev() {
-        *b = CROCKFORD[((data as u8) & 0x1f) as usize];
-        data >>= 5;
+impl<T: Type> TypeSafeId<T> {
+    fn to_array_string(&self) -> ArrayString<90> {
+        let mut out = ArrayString::new();
+
+        let mut buf = [0; 26];
+        let mut data = self.data.0;
+        for b in buf.iter_mut().rev() {
+            *b = CROCKFORD[((data as u8) & 0x1f) as usize];
+            assert!(b.is_ascii());
+            data >>= 5;
+        }
+
+        let s = std::str::from_utf8(&buf).unwrap();
+
+        if !self.tag.to_type_prefix().is_empty() {
+            out.push_str(self.tag.to_type_prefix());
+            out.push('_');
+        }
+        out.push_str(s);
+        out
     }
-    let s = std::str::from_utf8(&buf).map_err(|_| fmt::Error)?;
-    f.write_str(tag)?;
-    f.write_char('_')?;
-    f.write_str(s)
 }
 
 // basically just ripped from the uuid crate. they have it as unstable, but we can use it fine.
-#[inline]
 const fn encode_unix_timestamp_millis(millis: u64, random_bytes: &[u8; 10]) -> Uuid {
     let millis_high = ((millis >> 16) & 0xFFFF_FFFF) as u32;
     let millis_low = (millis & 0xFFFF) as u16;
@@ -345,90 +366,5 @@ const CROCKFORD_INV: &[u8; 256] = &{
         i += 1;
     }
 
-    // // uppercases
-    // let mut i = 10;
-    // while i < 32 {
-    //     output[(CROCKFORD[i as usize] - b'a' + b'A') as usize] = i;
-    //     i += 1;
-    // }
-
-    // // confusables
-    // output[b'O' as usize] = 0;
-    // output[b'o' as usize] = 0;
-
-    // output[b'I' as usize] = 1;
-    // output[b'i' as usize] = 1;
-    // output[b'L' as usize] = 1;
-    // output[b'l' as usize] = 1;
-
     output
 };
-
-#[cfg(test)]
-mod tests {
-
-    use std::str::FromStr;
-
-    use crate::{DynamicType, StaticType, TypeSafeId};
-
-    #[derive(Default)]
-    struct Prefix;
-
-    impl StaticType for Prefix {
-        const TYPE: &'static str = "prefix";
-    }
-
-    type PrefixId = TypeSafeId<Prefix>;
-
-    #[test]
-    fn works() {
-        let str = "prefix_01h2xcejqtf2nbrexx3vqjhp41";
-        let uuid = uuid::uuid!("0188bac7-4afa-78aa-bc3b-bd1eef28d881");
-
-        let uid: PrefixId = str.parse().unwrap();
-
-        assert_eq!(uid.uuid(), uuid);
-        assert_eq!(uid.to_string(), str);
-    }
-
-    #[test]
-    fn test_parse_valid() {
-        assert!(TypeSafeId::<DynamicType>::from_str("prefix_01h2xcejqtf2nbrexx3vqjhp41").is_ok());
-        assert!(TypeSafeId::<DynamicType>::from_str("prefix_00000000000000000000000000").is_ok());
-        assert!(TypeSafeId::<DynamicType>::from_str("prefix_00041061050r3gg28a1c60t3gf").is_ok());
-        assert!(TypeSafeId::<DynamicType>::from_str("user_2x4y6z8a0b1c2d3e4f5g6h7j8k").is_ok());
-        assert!(TypeSafeId::<DynamicType>::from_str("user_064gbdajmnxkk59ght00j0zxc8").is_ok());
-    }
-
-    #[test]
-    fn test_parse_invalid() {
-        assert!(TypeSafeId::<DynamicType>::from_str("too short").is_err());
-        assert!(
-            TypeSafeId::<DynamicType>::from_str("verylongstringbutitdoesnthaveunderscore").is_err()
-        );
-        assert!(
-            TypeSafeId::<DynamicType>::from_str("Invalid Prefix_064gaudtfto2f41a9u69osbirg")
-                .is_err()
-        );
-        assert!(TypeSafeId::<DynamicType>::from_str("user_064gaudtft@2f$1a9u69osbirg").is_err());
-        assert!(TypeSafeId::<DynamicType>::from_str("user_064gbdujmnxkk59ght00j0zxc8").is_err());
-        assert!(TypeSafeId::<DynamicType>::from_str("user_idpartisveryveryveryverylong").is_err());
-        assert!(TypeSafeId::<DynamicType>::from_str("_064gaudtfto2f41a9u69osbirg").is_err());
-        assert!(TypeSafeId::<DynamicType>::from_str(
-            "veryveryveryveryveryveryveryveryveryveryvery\
-                    veryveryveryveryveryveryveryveryveryveryverylongprefix\
-                    _064gaudtfto2f41a9u69osbirg"
-        )
-        .is_err());
-    }
-
-    #[test]
-    fn decodes_confusables() {
-        let confused = "prefix_0o1liABCDEFGHIJKLMNOPQRSTV";
-        let expected = "prefix_00111abcdefgh1jk1mn0pqrstv";
-
-        let uid: PrefixId = confused.parse().unwrap();
-        let actual = uid.to_string();
-        assert_eq!(actual, expected);
-    }
-}

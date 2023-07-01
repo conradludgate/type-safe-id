@@ -1,6 +1,6 @@
 [package]
 name = "type-safe-id"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "A type-safe, K-sortable, globally unique identifier"
 license = "MIT OR Apache-2.0"
@@ -8,14 +8,14 @@ repository = "https://github.com/conradludgate/type-safe-id"
 
 [features]
 default = []
-arbitrary = ["dep:arbitrary", "smol_str/arbitrary"]
-serde = ["dep:serde", "smol_str/serde"]
+arbitrary = ["dep:arbitrary"]
+serde = ["dep:serde"]
 
 [dependencies]
 uuid = { version = "1.2.0" }
 rand = { version = "0.8.0" }
 thiserror = "1.0.0"
-smol_str = "0.2.0"
+arrayvec = "0.7.0"
 
 serde = { version = "1.0.0", optional = true }
 arbitrary = { version = "1.0.0", optional = true }
@@ -28,6 +28,9 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dev-dependencies]
 criterion = "0.5"
 libtest-mimic = "0.6"
+serde_yaml = "0.9"
+serde = { version = "1", features = ["derive"] }
+uuid = { version = "1", features = ["serde"] }
 
 [[bench]]
 name = "type_id"
