@@ -10,7 +10,7 @@ impl<T: Type> Serialize for TypeSafeId<T> {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&self.to_array_string())
+        serializer.serialize_str(&super::to_array_string(self.type_prefix(), self.data))
     }
 }
 

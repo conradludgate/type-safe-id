@@ -30,6 +30,7 @@
 //! assert_eq!(user_id2.uuid(), user_id4.uuid(), "round trip works");
 //! ```
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![forbid(unsafe_code)]
 
 #[cfg(feature = "arbitrary")]
 mod arbitrary;
@@ -307,31 +308,30 @@ fn parse_base32_uuid7(id: &str) -> Result<Uuid128, Error> {
 
 impl<T: Type> fmt::Display for TypeSafeId<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_array_string())
+        f.write_str(&to_array_string(self.type_prefix(), self.data))
     }
 }
 
-impl<T: Type> TypeSafeId<T> {
-    fn to_array_string(&self) -> ArrayString<90> {
-        let mut out = ArrayString::new();
+fn to_array_string(prefix: &str, data: Uuid128) -> ArrayString<90> {
+    let mut out = ArrayString::new();
 
-        let mut buf = [0; 26];
-        let mut data = self.data.0;
-        for b in buf.iter_mut().rev() {
-            *b = CROCKFORD[((data as u8) & 0x1f) as usize];
-            assert!(b.is_ascii());
-            data >>= 5;
-        }
-
-        let s = std::str::from_utf8(&buf).unwrap();
-
-        if !self.tag.to_type_prefix().is_empty() {
-            out.push_str(self.tag.to_type_prefix());
-            out.push('_');
-        }
-        out.push_str(s);
-        out
+    if !prefix.is_empty() {
+        out.push_str(prefix);
+        out.push_str("_");
     }
+
+    let mut buf = [0; 26];
+    let mut data = data.0;
+    for b in buf.iter_mut().rev() {
+        *b = CROCKFORD[((data as u8) & 0x1f) as usize];
+        debug_assert!(b.is_ascii());
+        data >>= 5;
+    }
+
+    let s = std::str::from_utf8(&buf).expect("only ascii bytes should be in the buffer");
+
+    out.push_str(s);
+    out
 }
 
 // basically just ripped from the uuid crate. they have it as unstable, but we can use it fine.
