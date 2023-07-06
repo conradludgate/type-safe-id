@@ -55,8 +55,8 @@ pub enum Error {
         actual: String,
         expected: Cow<'static, str>,
     },
-    /// The ID data was not valid
-    #[error("id data is invalid")]
+    /// The ID suffix was not valid
+    #[error("id suffix is invalid")]
     InvalidData,
     /// The string was not formed as a type-id
     #[error("string is not a type-id")]
@@ -186,10 +186,19 @@ impl Type for DynamicType {
 /// assert_eq!(user_id1.uuid(), user_id3.uuid(), "round trip works");
 /// assert_eq!(user_id2.uuid(), user_id4.uuid(), "round trip works");
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TypeSafeId<T> {
     tag: T,
     data: Uuid128,
+}
+
+impl<T: Type> fmt::Debug for TypeSafeId<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TypeSafeId")
+            .field("tag", &self.tag.to_type_prefix())
+            .field("data", &self.data)
+            .finish()
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

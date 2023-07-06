@@ -53,3 +53,26 @@ let id: TypeSafeId<DynamicType> = "prefix_01h2xcejqtf2nbrexx3vqjhp41".parse().un
 assert_eq!(id.type_prefix(), "prefix");
 assert_eq!(id.uuid(), uuid::uuid!("0188bac7-4afa-78aa-bc3b-bd1eef28d881"));
 ```
+
+# Help
+
+```rust
+error[E0080]: evaluation of `<Index as type_safe_id::StaticType>::__TYPE_PREFIX_IS_VALID` failed
+  --> /Users/conrad/Documents/code/type-safe-id/src/lib.rs:76:13
+   |
+76 |             assert!(Self::TYPE.as_bytes()[i].is_ascii_lowercase());
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the evaluated program panicked at 'assertion failed: Self::TYPE.as_bytes()[i].is_ascii_lowercase()', /Users/conrad/Documents/code/type-safe-id/src/lib.rs:76:13
+```
+
+This compiler error suggests that your static type prefix is not valid because it contains non ascii-lowercase values.
+
+```rust
+error[E0080]: evaluation of `<Index as type_safe_id::StaticType>::__TYPE_PREFIX_IS_VALID` failed
+  --> /Users/conrad/Documents/code/type-safe-id/src/lib.rs:73:9
+   |
+73 |         assert!(Self::TYPE.len() < 64);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the evaluated program panicked at 'assertion failed: Self::TYPE.len() < 64', /Users/conrad/Documents/code/type-safe-id/src/lib.rs:73:9
+   |
+```
+
+This compiler error suggests that your static type prefix is not valid because it contains more than 63 characters.
