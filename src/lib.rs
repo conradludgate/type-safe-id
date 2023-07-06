@@ -292,7 +292,7 @@ fn parse_base32_uuid7(id: &str) -> Result<Uuid128, Error> {
         *b = CROCKFORD_INV[*b as usize];
         max |= *b;
     }
-    if max > 32 {
+    if max > 32 || id[0] > 7 {
         return Err(Error::InvalidData);
     }
 
