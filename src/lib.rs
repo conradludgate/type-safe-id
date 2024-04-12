@@ -65,7 +65,8 @@ pub enum Error {
 
 /// A static type prefix
 pub trait StaticType: Default {
-    /// must be lowercase ascii [a-z] only, under 64 characters
+    /// must be lowercase ascii [a-z_] only, under 64 characters.
+    /// first character cannot be an underscore
     const TYPE: &'static str;
 
     #[doc(hidden)]
@@ -73,8 +74,22 @@ pub trait StaticType: Default {
         assert!(Self::TYPE.len() < 64);
         let mut i = 0;
         while i < Self::TYPE.len() {
-            assert!(Self::TYPE.as_bytes()[i].is_ascii_lowercase());
+            let b = Self::TYPE.as_bytes()[i];
+            assert!(
+                matches!(b, b'a'..=b'z' | b'_'),
+                "type prefix must contain only lowercase ascii, or underscores"
+            );
             i += 1;
+        }
+        if !Self::TYPE.is_empty() {
+            assert!(
+                Self::TYPE.as_bytes()[0] != b'_',
+                "type prefix must not start with an underscore"
+            );
+            assert!(
+                Self::TYPE.as_bytes()[i - 1] != b'_',
+                "type prefix must not end with an underscore"
+            );
         }
         true
     };
@@ -134,7 +149,11 @@ impl DynamicType {
     /// ```
     pub fn new(s: &str) -> Result<Self, Error> {
         let tag: ArrayString<63> = s.try_into().map_err(|_| Error::InvalidType)?;
-        if tag.bytes().any(|x| !x.is_ascii_lowercase()) {
+
+        if tag.bytes().any(|b| !matches!(b, b'a'..=b'z' | b'_')) {
+            return Err(Error::InvalidType);
+        }
+        if !tag.is_empty() && (tag.as_bytes()[0] == b'_' || tag.as_bytes()[tag.len() - 1] == b'_') {
             return Err(Error::InvalidType);
         }
         Ok(Self(tag))
@@ -144,7 +163,10 @@ impl DynamicType {
 impl Type for DynamicType {
     fn try_from_type_prefix(tag: &str) -> Result<Self, Cow<'static, str>> {
         let tag: ArrayString<63> = tag.try_into().map_err(|_| tag[..63].to_owned())?;
-        if tag.bytes().any(|x| !x.is_ascii_lowercase()) {
+        if tag.bytes().any(|b| !matches!(b, b'a'..=b'z' | b'_')) {
+            return Err(tag.to_lowercase().into());
+        }
+        if !tag.is_empty() && (tag.as_bytes()[0] == b'_' || tag.as_bytes()[tag.len() - 1] == b'_') {
             return Err(tag.to_lowercase().into());
         }
         Ok(Self(tag))
@@ -278,7 +300,7 @@ impl<T: Type> FromStr for TypeSafeId<T> {
 
     fn from_str(id: &str) -> Result<Self, Self::Err> {
         let (tag, id) = match id.rsplit_once('_') {
-            Some((tag, _)) if tag.is_empty() => return Err(Error::InvalidType),
+            Some(("", _)) => return Err(Error::InvalidType),
             Some((tag, id)) => (tag, id),
             None => ("", id),
         };
