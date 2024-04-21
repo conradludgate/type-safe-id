@@ -1,7 +1,7 @@
 use arbitrary::{Arbitrary, Result, Unstructured};
 use arrayvec::ArrayString;
 
-use crate::{encode_unix_timestamp_millis, DynamicType, StaticType, TypeSafeId};
+use crate::{DynamicType, StaticType, TypeSafeId};
 
 #[cfg_attr(docsrs, doc(cfg(feature = "arbitrary")))]
 impl<'a, T: StaticType> Arbitrary<'a> for TypeSafeId<T> {
@@ -11,7 +11,7 @@ impl<'a, T: StaticType> Arbitrary<'a> for TypeSafeId<T> {
 
         Ok(Self::from_type_and_uuid(
             T::default(),
-            encode_unix_timestamp_millis(millis, &data),
+            uuid::Builder::from_unix_timestamp_millis(millis, &data).into_uuid(),
         ))
     }
 }
@@ -43,7 +43,7 @@ impl<'a> Arbitrary<'a> for TypeSafeId<DynamicType> {
 
         Ok(Self::from_type_and_uuid(
             tag,
-            encode_unix_timestamp_millis(millis, &data),
+            uuid::Builder::from_unix_timestamp_millis(millis, &data).into_uuid(),
         ))
     }
 }

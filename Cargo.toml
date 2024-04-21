@@ -12,7 +12,7 @@ arbitrary = ["dep:arbitrary"]
 serde = ["dep:serde"]
 
 [dependencies]
-uuid = { version = "1.2.0" }
+uuid = { version = "1.6.0", features = ["v7"] }
 rand = { version = "0.8.0" }
 thiserror = "1.0.0"
 arrayvec = "0.7.0"
