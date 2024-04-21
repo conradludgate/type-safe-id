@@ -208,7 +208,7 @@ impl Type for DynamicType {
 /// assert_eq!(user_id1.uuid(), user_id3.uuid(), "round trip works");
 /// assert_eq!(user_id2.uuid(), user_id4.uuid(), "round trip works");
 /// ```
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TypeSafeId<T> {
     tag: T,
     data: Uuid128,
