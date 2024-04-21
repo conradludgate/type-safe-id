@@ -211,7 +211,7 @@ impl Type for DynamicType {
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TypeSafeId<T> {
     tag: T,
-    data: Uuid128,
+    data: Uuid,
 }
 
 impl<T: Type> fmt::Debug for TypeSafeId<T> {
@@ -225,12 +225,6 @@ impl<T: Type> fmt::Debug for TypeSafeId<T> {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct Uuid128(u128);
-
-impl fmt::Debug for Uuid128 {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Uuid::from(*self).fmt(f)
-    }
-}
 
 impl From<Uuid> for Uuid128 {
     fn from(value: Uuid) -> Self {
@@ -283,7 +277,7 @@ impl<T: Type> TypeSafeId<T> {
     pub fn from_type_and_uuid(type_prefix: T, data: Uuid) -> Self {
         Self {
             tag: type_prefix,
-            data: data.into(),
+            data,
         }
     }
 
@@ -291,7 +285,7 @@ impl<T: Type> TypeSafeId<T> {
         self.tag.to_type_prefix()
     }
     pub fn uuid(&self) -> Uuid {
-        self.data.into()
+        self.data
     }
 }
 
@@ -312,7 +306,7 @@ impl<T: Type> FromStr for TypeSafeId<T> {
 
         Ok(Self {
             tag,
-            data: parse_base32_uuid7(id)?,
+            data: parse_base32_uuid7(id)?.into(),
         })
     }
 }
@@ -339,7 +333,7 @@ fn parse_base32_uuid7(id: &str) -> Result<Uuid128, Error> {
 
 impl<T: Type> fmt::Display for TypeSafeId<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&to_array_string(self.type_prefix(), self.data))
+        f.write_str(&to_array_string(self.type_prefix(), self.data.into()))
     }
 }
 
