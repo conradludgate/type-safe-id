@@ -39,6 +39,7 @@ mod arbitrary;
 mod serde;
 
 use std::{borrow::Cow, fmt, str::FromStr};
+use std::hash::Hash;
 
 use arrayvec::ArrayString;
 use uuid::{NoContext, Uuid};
@@ -223,7 +224,14 @@ impl<T: Type> fmt::Debug for TypeSafeId<T> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+impl Hash for TypeSafeId<DynamicType> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.tag.to_type_prefix().hash(state);
+        self.data.hash(state);
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Uuid128(u128);
 
 impl From<Uuid> for Uuid128 {
