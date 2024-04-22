@@ -39,6 +39,7 @@ mod arbitrary;
 mod serde;
 
 use std::{borrow::Cow, fmt, str::FromStr};
+use std::hash::Hash;
 
 use arrayvec::ArrayString;
 use uuid::{NoContext, Uuid};
@@ -208,7 +209,7 @@ impl Type for DynamicType {
 /// assert_eq!(user_id1.uuid(), user_id3.uuid(), "round trip works");
 /// assert_eq!(user_id2.uuid(), user_id4.uuid(), "round trip works");
 /// ```
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TypeSafeId<T> {
     tag: T,
     data: Uuid128,
@@ -223,7 +224,14 @@ impl<T: Type> fmt::Debug for TypeSafeId<T> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+impl Hash for TypeSafeId<DynamicType> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.tag.to_type_prefix().hash(state);
+        self.data.hash(state);
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Uuid128(u128);
 
 impl fmt::Debug for Uuid128 {
