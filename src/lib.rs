@@ -224,14 +224,13 @@ impl<T: Type> fmt::Debug for TypeSafeId<T> {
     }
 }
 
-impl Hash for TypeSafeId<DynamicType> {
+impl<T: Type> Hash for TypeSafeId<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.tag.to_type_prefix().hash(state);
         self.data.hash(state);
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Uuid128(u128);
 
 impl From<Uuid> for Uuid128 {
