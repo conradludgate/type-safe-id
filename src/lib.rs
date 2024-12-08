@@ -38,8 +38,8 @@ mod arbitrary;
 #[cfg(feature = "serde")]
 mod serde;
 
-use std::{borrow::Cow, fmt, str::FromStr};
 use std::hash::Hash;
+use std::{borrow::Cow, fmt, str::FromStr};
 
 use arrayvec::ArrayString;
 use uuid::{NoContext, Uuid};
@@ -258,6 +258,12 @@ impl<T: StaticType> TypeSafeId<T> {
     /// Create a new type-id from the given uuid data
     pub fn from_uuid(data: Uuid) -> Self {
         Self::from_type_and_uuid(T::default(), data)
+    }
+}
+
+impl<T: StaticType> From<Uuid> for TypeSafeId<T> {
+    fn from(data: Uuid) -> Self {
+        Self::from_uuid(data)
     }
 }
 
