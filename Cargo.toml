@@ -1,6 +1,6 @@
 [package]
 name = "type-safe-id"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 description = "A type-safe, K-sortable, globally unique identifier"
 license = "MIT OR Apache-2.0"
@@ -14,7 +14,7 @@ serde = ["dep:serde"]
 [dependencies]
 uuid = { version = "1.6.0", features = ["v7"] }
 rand = { version = "0.8.0" }
-thiserror = "1.0.0"
+thiserror = "2.0.0"
 arrayvec = "0.7.0"
 
 serde = { version = "1.0.0", optional = true }
@@ -27,7 +27,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dev-dependencies]
 criterion = "0.5"
-libtest-mimic = "0.7"
+libtest-mimic = "0.8"
 serde_yaml = "0.9"
 serde = { version = "1", features = ["derive"] }
 uuid = { version = "1", features = ["serde"] }
