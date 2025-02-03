@@ -259,6 +259,13 @@ impl<T: StaticType> TypeSafeId<T> {
     pub fn from_uuid(data: Uuid) -> Self {
         Self::from_type_and_uuid(T::default(), data)
     }
+
+    /// The length of a type-id string with the given (static) type
+    pub const fn static_len() -> usize {
+        T::TYPE.len() + // Prefix length
+        1 + // `_` length
+        ENCODED_UUID_LEN
+    }
 }
 
 impl<T: StaticType> From<Uuid> for TypeSafeId<T> {
@@ -297,6 +304,17 @@ impl<T: Type> TypeSafeId<T> {
     pub fn type_prefix(&self) -> &str {
         self.tag.to_type_prefix()
     }
+
+    /// The length of a type-id string with the given type
+    ///
+    /// If your prefix is static, you can also use [`TypeSafeId::static_len`].
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.type_prefix().len() +
+        1 + // `_` length
+        ENCODED_UUID_LEN
+    }
+
     pub fn uuid(&self) -> Uuid {
         self.data
     }
@@ -324,8 +342,12 @@ impl<T: Type> FromStr for TypeSafeId<T> {
     }
 }
 
+/// Encoded UUID length (see <https://github.com/jetify-com/typeid/tree/main/spec#uuid-suffix>)
+const ENCODED_UUID_LEN: usize = 26;
+
 fn parse_base32_uuid7(id: &str) -> Result<Uuid128, Error> {
-    let mut id: [u8; 26] = id.as_bytes().try_into().map_err(|_| Error::InvalidData)?;
+    let mut id: [u8; ENCODED_UUID_LEN] =
+        id.as_bytes().try_into().map_err(|_| Error::InvalidData)?;
     let mut max = 0;
     for b in &mut id {
         *b = CROCKFORD_INV[*b as usize];
@@ -358,7 +380,7 @@ fn to_array_string(prefix: &str, data: Uuid128) -> ArrayString<90> {
         out.push_str("_");
     }
 
-    let mut buf = [0; 26];
+    let mut buf = [0; ENCODED_UUID_LEN];
     let mut data = data.0;
     for b in buf.iter_mut().rev() {
         *b = CROCKFORD[((data as u8) & 0x1f) as usize];
