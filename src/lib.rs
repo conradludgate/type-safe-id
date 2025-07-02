@@ -251,7 +251,7 @@ impl<T: StaticType> TypeSafeId<T> {
         Self::new_with_ts_rng(
             T::default(),
             uuid::Timestamp::now(NoContext),
-            &mut rand::thread_rng(),
+            &mut rand::rng(),
         )
     }
 
@@ -280,7 +280,7 @@ impl<T: Type> TypeSafeId<T> {
         Self::new_with_ts_rng(
             type_prefix,
             uuid::Timestamp::now(NoContext),
-            &mut rand::thread_rng(),
+            &mut rand::rng(),
         )
     }
 
@@ -289,7 +289,7 @@ impl<T: Type> TypeSafeId<T> {
         let millis = (secs * 1000).saturating_add(nanos as u64 / 1_000_000);
         Self::from_type_and_uuid(
             type_prefix,
-            uuid::Builder::from_unix_timestamp_millis(millis, &rng.gen()).into_uuid(),
+            uuid::Builder::from_unix_timestamp_millis(millis, &rng.random()).into_uuid(),
         )
     }
 
