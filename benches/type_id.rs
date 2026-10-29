@@ -1,6 +1,6 @@
-use std::{io::Write, str::FromStr};
+use std::{hint::black_box, io::Write, str::FromStr};
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use type_safe_id::{StaticType, TypeSafeId};
 use uuid::{uuid, Uuid};
 
