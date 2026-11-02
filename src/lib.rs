@@ -67,11 +67,38 @@ pub enum Error {
 /// A static type prefix
 pub trait StaticType: Default {
     /// must be lowercase ascii [a-z_] only, under 64 characters.
-    /// first character cannot be an underscore
+    /// The first and last characters cannot be underscores. An empty prefix is valid.
     const TYPE: &'static str;
 
-    #[doc(hidden)]
-    const __TYPE_PREFIX_IS_VALID: bool = {
+    /// Validate [`Self::TYPE`] without constructing or formatting an ID.
+    ///
+    /// The default implementation evaluates to `true` for a valid prefix and
+    /// panics for an invalid one. Reference this constant from a `const` item to
+    /// reject an invalid prefix at compile time, even if the ID is never used.
+    /// Implementations should use the provided default.
+    ///
+    /// ```
+    /// use type_safe_id::StaticType;
+    ///
+    /// #[derive(Default)]
+    /// struct User;
+    /// impl StaticType for User {
+    ///     const TYPE: &'static str = "user";
+    /// }
+    /// const _: () = assert!(User::TYPE_PREFIX_IS_VALID);
+    /// ```
+    ///
+    /// ```compile_fail
+    /// use type_safe_id::StaticType;
+    ///
+    /// #[derive(Default)]
+    /// struct Invalid;
+    /// impl StaticType for Invalid {
+    ///     const TYPE: &'static str = "Invalid";
+    /// }
+    /// const _: () = assert!(Invalid::TYPE_PREFIX_IS_VALID);
+    /// ```
+    const TYPE_PREFIX_IS_VALID: bool = {
         assert!(Self::TYPE.len() < 64);
         let mut i = 0;
         while i < Self::TYPE.len() {
@@ -108,7 +135,7 @@ pub trait Type: Sized {
 
 impl<T: StaticType> Type for T {
     fn try_from_type_prefix(tag: &str) -> Result<Self, Cow<'static, str>> {
-        assert!(Self::__TYPE_PREFIX_IS_VALID);
+        assert!(Self::TYPE_PREFIX_IS_VALID);
         if tag != Self::TYPE {
             Err(Self::TYPE.into())
         } else {
@@ -117,7 +144,7 @@ impl<T: StaticType> Type for T {
     }
 
     fn to_type_prefix(&self) -> &str {
-        assert!(Self::__TYPE_PREFIX_IS_VALID);
+        assert!(Self::TYPE_PREFIX_IS_VALID);
         Self::TYPE
     }
 }
