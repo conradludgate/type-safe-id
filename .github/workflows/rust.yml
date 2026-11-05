@@ -57,6 +57,7 @@ jobs:
           toolchain: stable
           override: true
       - run: cargo install cargo-audit
-      - uses: actions-rs/audit-check@v1.2.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Audit dependencies
+        run: |
+          cargo generate-lockfile
+          cargo audit
