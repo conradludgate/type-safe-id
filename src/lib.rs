@@ -190,7 +190,13 @@ impl DynamicType {
 
 impl Type for DynamicType {
     fn try_from_type_prefix(tag: &str) -> Result<Self, Cow<'static, str>> {
-        let tag: ArrayString<63> = tag.try_into().map_err(|_| tag[..63].to_owned())?;
+        let tag: ArrayString<63> = tag.try_into().map_err(|_| {
+            let mut end = 63;
+            while !tag.is_char_boundary(end) {
+                end -= 1;
+            }
+            tag[..end].to_owned()
+        })?;
         if tag.bytes().any(|b| !matches!(b, b'a'..=b'z' | b'_')) {
             return Err(tag.to_lowercase().into());
         }
