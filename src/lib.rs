@@ -295,9 +295,11 @@ impl<T: StaticType> TypeSafeId<T> {
 
     /// The length of a type-id string with the given (static) type
     pub const fn static_len() -> usize {
-        T::TYPE.len() + // Prefix length
-        1 + // `_` length
-        ENCODED_UUID_LEN
+        if T::TYPE.is_empty() {
+            ENCODED_UUID_LEN
+        } else {
+            T::TYPE.len() + 1 + ENCODED_UUID_LEN
+        }
     }
 }
 
@@ -343,9 +345,12 @@ impl<T: Type> TypeSafeId<T> {
     /// If your prefix is static, you can also use [`TypeSafeId::static_len`].
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
-        self.type_prefix().len() +
-        1 + // `_` length
-        ENCODED_UUID_LEN
+        let prefix = self.type_prefix();
+        if prefix.is_empty() {
+            ENCODED_UUID_LEN
+        } else {
+            prefix.len() + 1 + ENCODED_UUID_LEN
+        }
     }
 
     pub fn uuid(&self) -> Uuid {
